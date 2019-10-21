@@ -6,29 +6,35 @@ class Encoder(tf.keras.Model):
     # Seq2Seq 的Encoder部分
     """
 
-    def __init__(self, vocab_size, embedding_dim, enc_units, batch_sz, embedding_matrix):
+    def __init__(self, vocab_size, embedding_dim, enc_units, batch_sz, embedding_matrix, use_bigru=False):
         super(Encoder, self).__init__()
         self.batch_sz = batch_sz
         self.enc_units = enc_units
         self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim, weights=[embedding_matrix])
+        self.use_bigru = use_bigru
         self.gru = tf.keras.layers.GRU(self.enc_units,
                                        return_sequences=True,
                                        return_state=True,
                                        recurrent_initializer='glorot_uniform')
-        # self.bigru = tf.keras.layers.Bidirectional(self.gru, merge_mode='concat')
+        if use_bigru:
+            self.bigru = tf.keras.layers.Bidirectional(self.gru, merge_mode='concat')
 
     def call(self, sentences, hidden):
         embed = self.embedding(sentences)
-        # hidden = tf.split(hidden, num_or_size_splits=2, axis=1)
-        # output, forward_state, backward_state = self.bigru(embed, initial_state=hidden)
-        # state = tf.concat([forward_state, backward_state], axis=1)
-        output, state = self.gru(embed, initial_state=hidden)
+        if self.use_bigru:
+            hidden = tf.split(hidden, num_or_size_splits=2, axis=1)
+            output, forward_state, backward_state = self.bigru(embed, initial_state=hidden)
+            state = tf.concat([forward_state, backward_state], axis=1)
+        else:
+            output, state = self.gru(embed, initial_state=hidden)
 
         return output, state
 
-    def initialize_hidden_state(self):
-        # return tf.zeros((self.batch_sz, 2 * self.enc_units))
-        return tf.zeros((self.batch_sz, self.enc_units))
+    def initialize_hidden_state(self, batch_sz):
+        if self.use_bigru:
+            return tf.zeros((batch_sz, 2 * self.enc_units))
+        else:
+            return tf.zeros((batch_sz, self.enc_units))
 
 
 class BahdanauAttention(tf.keras.Model):
@@ -69,21 +75,25 @@ class Decoder(tf.keras.Model):
     Seq2Seq 的Decoder部分
     """
 
-    def __init__(self, vocab_size, embedding_dim, dec_units, batch_sz, embedding_matrix):
+    def __init__(self, vocab_size, embedding_dim, dec_units, batch_sz, embedding_matrix, use_bigru=False):
         super(Decoder, self).__init__()
         self.batch_sz = batch_sz
         self.dec_units = dec_units
+        self.use_bigru = use_bigru
         self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim, weights=[embedding_matrix])
         self.gru = tf.keras.layers.GRU(self.dec_units,
                                        return_sequences=True,
                                        return_state=True,
                                        recurrent_initializer='glorot_uniform')
+        if use_bigru:
+            self.bigru = tf.keras.layers.Bidirectional(self.gru, merge_mode='concat')
         self.fc = tf.keras.layers.Dense(vocab_size)
 
-        # used for attention
+        # used for attentionEpoch
         self.attention = BahdanauAttention(self.dec_units)
 
-    def call(self, x, hidden, enc_output, is_train=True):
+    def call(self, x, hidden, enc_output, is_train=True, dropout=False):
+
         # enc_output shape == (batch_size, max_length, hidden_size)
         context_vector, attention_weights = self.attention(hidden, enc_output)
 
@@ -92,16 +102,19 @@ class Decoder(tf.keras.Model):
 
         # x shape after concatenation == (batch_size, 1, embedding_dim + hidden_size)
         x = tf.concat([tf.expand_dims(context_vector, 1), x], axis=-1)
-
-        # passing the concatenated vector to the GRU
-        output, state = self.gru(x)
-
-        # output shape == (batch_size * 1, hidden_size)
-        output = tf.reshape(output, (-1, output.shape[2]))
+        if self.use_bigru:
+            hidden = tf.split(hidden, num_or_size_splits=2, axis=1)
+            output, forward_state, backward_state = self.bigru(x, initial_state=hidden)
+            state = tf.concat([forward_state, backward_state], axis=1)
+        else:
+            # output shape == (batch_size * 1, hidden_size)
+            # passing the concatenated vector to the GRU
+            output, state = self.gru(x)
+            output = tf.reshape(output, (-1, output.shape[2]))
 
         # output shape == (batch_size, vocab)
         x = self.fc(output)
-        if is_train:
+        if is_train and dropout:
             x = tf.nn.dropout(x, 0.5)
 
         return x, state, attention_weights
