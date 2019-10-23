@@ -24,4 +24,4 @@ checkpoint_dir = os.path.join(os.path.abspath('./'), 'checkpoints', 'training_ch
 # result path
 result_path = os.path.join(os.path.abspath('./'), 'datasets', 'result.csv')
 
-embedding_size = 100
+embedding_size = 256

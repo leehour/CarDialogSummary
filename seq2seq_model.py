@@ -76,6 +76,15 @@ class Decoder(tf.keras.Model):
     """
 
     def __init__(self, vocab_size, embedding_dim, dec_units, batch_sz, embedding_matrix, use_bigru=False):
+        """
+
+        :param vocab_size:
+        :param embedding_dim:
+        :param dec_units:
+        :param batch_sz:
+        :param embedding_matrix:
+        :param use_bigru:一般decoder不使用bigru
+        """
         super(Decoder, self).__init__()
         self.batch_sz = batch_sz
         self.dec_units = dec_units

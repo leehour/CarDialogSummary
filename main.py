@@ -20,12 +20,12 @@ dataset_num = 100
 
 open_bigru = False
 
-EPOCHS = 10
+EPOCHS = 5
 BATCH_SIZE = 16
-units = 128
+units = 512
 
 params = {
-    'learning_rate': 0.001,
+    'learning_rate': 0.0001,
     'adagrad_init_acc': 0.1,
     'max_grad_norm': 2
 }
@@ -65,7 +65,7 @@ def max_length(tensor):
     return max(len(t) for t in tensor)
 
 
-def get_embedding(word_index_input, word_index_target, embed_size=100):
+def get_embedding(word_index_input, word_index_target, embed_size=256):
     """
     获取input和target的embedding matrix
     :param word_index_input: 输入词典
@@ -73,25 +73,27 @@ def get_embedding(word_index_input, word_index_target, embed_size=100):
     :param embed_size:embedding size
     :return:
     """
-    #     num_input_en = min(max_words_size, len(word_index_input)) + 1
     num_input_en = len(word_index_input) + 1
+    # num_input_en = min(max_words_size, len(word_index_input))
     encoder_embedding = np.zeros((num_input_en, embed_size))
     for word, id in word_index_input.items():
-        if word not in model.vocab:
-            word_vec = np.random.uniform(-0.25, 0.25, embed_size)
-        else:
-            word_vec = model.word_vec(word)
-        encoder_embedding[id] = word_vec
+        if id < num_input_en:
+            if word not in model.vocab:
+                word_vec = np.random.uniform(-0.25, 0.25, embed_size)
+            else:
+                word_vec = model.word_vec(word)
+            encoder_embedding[id] = word_vec
 
     num_input_de = len(word_index_target) + 1
-    #     num_input_de = min(max_words_size, len(word_index_target)) + 1
+    # num_input_de = min(max_words_size, len(word_index_target))
     decoder_embedding = np.zeros((num_input_de, embed_size))
     for word, id in word_index_target.items():
-        if word not in model.vocab:
-            word_vec = np.random.uniform(-0.25, 0.25, embed_size)
-        else:
-            word_vec = model.word_vec(word)
-        decoder_embedding[id] = word_vec
+        if id < num_input_de:
+            if word not in model.vocab:
+                word_vec = np.random.uniform(-0.25, 0.25, embed_size)
+            else:
+                word_vec = model.word_vec(word)
+            decoder_embedding[id] = word_vec
     return encoder_embedding, decoder_embedding
 
 
@@ -125,7 +127,7 @@ def train_step(inp, targ, enc_hidden, loss_object, encoder, decoder, tokenizer_t
         # Teacher forcing - feeding the target as the next input
         for t in range(1, targ.shape[1]):
             # passing enc_output to the decoder
-            predictions, dec_hidden, _ = decoder(dec_input, dec_hidden, enc_output)
+            predictions, dec_hidden, _ = decoder(dec_input, dec_hidden, enc_output, dropout=True)
 
             loss += loss_function(targ[:, t], predictions, loss_object)
 
@@ -223,12 +225,12 @@ if __name__ == '__main__':
     dataset = dataset.batch(BATCH_SIZE, drop_remainder=True)
 
     encoder = Encoder(vocab_inp_size, embedding_dim, units, BATCH_SIZE, encoder_embedding, open_bigru)
-    decoder = Decoder(vocab_tar_size, embedding_dim, units, BATCH_SIZE, decoder_embedding, open_bigru)
+    decoder = Decoder(vocab_tar_size, embedding_dim, units, BATCH_SIZE, decoder_embedding)
 
-    optimizer = tf.keras.optimizers.Adam()
-    # optimizer = tf.keras.optimizers.Adagrad(params['learning_rate'],
-    #                                         initial_accumulator_value=params['adagrad_init_acc'],
-    #                                         clipnorm=params['max_grad_norm'])
+    # optimizer = tf.keras.optimizers.Adam()
+    optimizer = tf.keras.optimizers.Adagrad(params['learning_rate'],
+                                            initial_accumulator_value=params['adagrad_init_acc'],
+                                            clipnorm=params['max_grad_norm'])
     loss_object = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, reduction='none')
 
     checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
