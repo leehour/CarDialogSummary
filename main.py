@@ -4,7 +4,8 @@ import pandas as pd
 from gensim.models import KeyedVectors
 
 from config import train_seg_merge_path, test_seg_merge_path, w2v_bin_path, checkpoint_dir, \
-    result_path, embedding_size
+    result_path, embedding_size, max_words_size, BATCH_SIZE, dataset_num, units, params, EPOCHS, open_bigru, \
+    max_input_size, max_target_size
 from sklearn.model_selection import train_test_split
 import numpy as np
 import tensorflow as tf
@@ -12,34 +13,12 @@ import time
 import os
 
 from seq2seq_model import Encoder, Decoder
-
-max_words_size = 30000
-max_input_size = 500
-max_target_size = 50
-dataset_num = 100
-
-open_bigru = False
-
-EPOCHS = 5
-BATCH_SIZE = 16
-units = 512
-
-params = {
-    'learning_rate': 0.0001,
-    'adagrad_init_acc': 0.1,
-    'max_grad_norm': 2
-}
-
-data_train_merge = pd.read_csv(train_seg_merge_path)
-data_test_merge = pd.read_csv(test_seg_merge_path)
-
-# load 词向量模型
-model = KeyedVectors.load_word2vec_format(w2v_bin_path, binary=True)
+from utils.embedding_gen import get_embedding
 
 
 def preprocess_word(w):
-    w = re.sub(r"([?.!,¿])", r" \1 ", w)
-    w = re.sub(r'[" "]+', " ", w)
+    w = re.sub(r"([?.!,¿])", r" \1 ", str(w))
+    w = re.sub(r'[" "]+', " ", str(w))
 
     # adding a start and an end token to the sentence
     # so that the model know when to start and stop predicting.
@@ -56,46 +35,12 @@ def tokenize(texts, max_len):
     tensor = tf.keras.preprocessing.sequence.pad_sequences(tensor, max_len, padding='post')
     return tensor, word_index, tokenizer
 
-
 def max_length(tensor):
     """
     :param tensor:
     :return:返回每个tensor的长度的最大值
     """
     return max(len(t) for t in tensor)
-
-
-def get_embedding(word_index_input, word_index_target, embed_size=256):
-    """
-    获取input和target的embedding matrix
-    :param word_index_input: 输入词典
-    :param word_index_target: 输出词典
-    :param embed_size:embedding size
-    :return:
-    """
-    num_input_en = len(word_index_input) + 1
-    # num_input_en = min(max_words_size, len(word_index_input))
-    encoder_embedding = np.zeros((num_input_en, embed_size))
-    for word, id in word_index_input.items():
-        if id < num_input_en:
-            if word not in model.vocab:
-                word_vec = np.random.uniform(-0.25, 0.25, embed_size)
-            else:
-                word_vec = model.word_vec(word)
-            encoder_embedding[id] = word_vec
-
-    num_input_de = len(word_index_target) + 1
-    # num_input_de = min(max_words_size, len(word_index_target))
-    decoder_embedding = np.zeros((num_input_de, embed_size))
-    for word, id in word_index_target.items():
-        if id < num_input_de:
-            if word not in model.vocab:
-                word_vec = np.random.uniform(-0.25, 0.25, embed_size)
-            else:
-                word_vec = model.word_vec(word)
-            decoder_embedding[id] = word_vec
-    return encoder_embedding, decoder_embedding
-
 
 def loss_function(real, pred, loss_object):
     """
@@ -195,6 +140,13 @@ def predict_report(sentence, tokenizer_input, tokenizer_target, encoder, decoder
 
 
 if __name__ == '__main__':
+
+    data_train_merge = pd.read_csv(train_seg_merge_path)
+    data_test_merge = pd.read_csv(test_seg_merge_path)
+
+    # load 词向量模型
+    model = KeyedVectors.load_word2vec_format(w2v_bin_path, binary=True)
+
     # 添加<start><end>
     data_train_merge['input'] = data_train_merge['input'].apply(preprocess_word).copy()
     data_train_merge['Report'] = data_train_merge['Report'].apply(preprocess_word).copy()
@@ -208,7 +160,7 @@ if __name__ == '__main__':
     max_length_targ, max_length_inp = max_length(tensor_target), max_length(tensor_input)
 
     # 构造embedding matrix
-    encoder_embedding, decoder_embedding = get_embedding(word_index_input, word_index_target, embed_size=embedding_size)
+    encoder_embedding, decoder_embedding = get_embedding(word_index_input, word_index_target, model, embed_size=embedding_size)
 
     # Creating training and validation sets using an 80-20 split
     input_tensor_train, input_tensor_val, target_tensor_train, target_tensor_val = \

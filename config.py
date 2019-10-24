@@ -1,7 +1,7 @@
 import os
 
 # stop_words 路径
-stop_words_path = os.path.join(os.path.abspath('./'), 'datasets', 'stopwords.txt')
+stop_words_path = os.path.join(os.path.abspath('./'), 'datasets', 'stop_words.txt')
 
 # 数据路径
 train_path = os.path.join(os.path.abspath('./'), 'datasets', 'AutoMaster_TrainSet.csv')
@@ -22,6 +22,23 @@ w2v_bin_path = os.path.join(os.path.abspath('./'), 'model', 'model.bin')
 checkpoint_dir = os.path.join(os.path.abspath('./'), 'checkpoints', 'training_checkpoints')
 
 # result path
-result_path = os.path.join(os.path.abspath('./'), 'datasets', 'result.csv')
+result_path = os.path.join(os.path.abspath('./'), 'datasets', 'result_data5w_epoch5_unit512.csv')
 
 embedding_size = 256
+
+max_words_size = 30000
+max_input_size = 500
+max_target_size = 50
+dataset_num = 10000
+
+open_bigru = False
+
+EPOCHS = 10
+BATCH_SIZE = 16
+units = 350
+
+params = {
+    'learning_rate': 0.001,
+    'adagrad_init_acc': 0.1,
+    'max_grad_norm': 2
+}

@@ -2,12 +2,12 @@ import pandas as pd
 from gensim.models.word2vec import Word2Vec
 
 from config import train_seg_path, test_seg_path, train_seg_merge_path, test_seg_merge_path, w2v_bin_path, \
-    embedding_size
+    embedding_size, result_path
 
 
 def build_dataset(data_train, data_test):
     lines = []
-    for k in ['Brand', 'Model', 'Question', 'Dialogue', 'Report']:
+    for k in ['input', 'Report']:
         train_str = list(data_train[k].apply(str).values)
         if k != 'Report':
             test_str = list(data_test[k].apply(str).values)
@@ -21,7 +21,7 @@ def build_dataset(data_train, data_test):
     return lines
 
 
-def build(train_vocab, w2v_bin_path="model.bin", embedding_size=100, min_count=5, col_sep='\t'):
+def build(train_vocab, w2v_bin_path="model.bin", embedding_size=256, min_count=5, col_sep='\t'):
     #     sentences = extract_sentence(train_seg_path, test_seg_path, col_sep=col_sep)
     #     save_sentence(sentences, sentence_path)
     print('train w2v model...')
@@ -36,25 +36,12 @@ def build(train_vocab, w2v_bin_path="model.bin", embedding_size=100, min_count=5
 
 
 if __name__ == '__main__':
-    data_train = pd.read_csv(train_seg_path)
-    data_test = pd.read_csv(test_seg_path)
+    """open when you need train the w2v model
+    
+    """
+    # data_train = pd.read_csv(train_seg_merge_path)
+    # data_test = pd.read_csv(test_seg_merge_path)
 
-    # 训练词向量模型时打开
     # train_texts = build_dataset(data_train, data_test)
     # print(len(train_texts))
     # build(train_texts, w2v_bin_path=w2v_bin_path, embedding_size=embedding_size, min_count=3)
-
-    data_train.dropna(axis=0, how='any', inplace=True)
-    data_test.dropna(axis=0, how='any', inplace=True)
-
-    # 合并除report的字段
-    data_train['input'] = data_train['Brand'] + ' ' + data_train['Model'] + ' ' + data_train['Question'] + ' ' + \
-                          data_train['Dialogue']
-    data_train.drop(['Brand', 'Model', 'Question', 'Dialogue'], axis=1, inplace=True)
-
-    data_test['input'] = data_test['Brand'] + ' ' + data_test['Model'] + ' ' + data_test['Question'] + ' ' + data_test[
-        'Dialogue']
-    data_test.drop(['Brand', 'Model', 'Question', 'Dialogue'], axis=1, inplace=True)
-
-    data_train.to_csv(train_seg_merge_path, index=False)
-    data_test.to_csv(test_seg_merge_path, index=False)
